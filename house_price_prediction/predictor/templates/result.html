@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amanix Estate | Premium House Price Prediction</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --secondary: #ec4899;
+            --bg-overlay: rgba(15, 23, 42, 0.75);
+            --surface: rgba(30, 41, 59, 0.45);
+            --border: rgba(255, 255, 255, 0.15);
+            --text: #f8fafc;
+            --text-muted: #cbd5e1;
+            --error: #ef4444;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow-x: hidden;
+            padding: 2rem 1rem;
+        }
+
+        /* Beautiful Blurred Background */
+        .bg-image {
+            position: fixed;
+            top: -5%;
+            left: -5%;
+            width: 110vw;
+            height: 110vh;
+            background: url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2075&q=80') center/cover no-repeat;
+            filter: blur(8px);
+            z-index: -2;
+            animation: subtleZoom 20s infinite alternate ease-in-out;
+        }
+
+        .bg-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.6) 100%);
+            z-index: -1;
+        }
+
+        @keyframes subtleZoom {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 850px;
+            background: var(--surface);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 3.5rem;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.2);
+            animation: floatUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(40px);
+            position: relative;
+        }
+
+        @keyframes floatUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3.5rem;
+            animation: fadeIn 1s 0.3s forwards;
+            opacity: 0;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #a78bfa, #f472b6, #a78bfa);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.75rem;
+            animation: gradientShine 4s linear infinite;
+        }
+
+        @keyframes gradientShine {
+            to { background-position: 200% center; }
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            letter-spacing: 0.5px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 2rem 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .map-section {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.8s 0.9s forwards;
+            opacity: 0;
+        }
+
+        #map {
+            height: 280px;
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            z-index: 1;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        #map.fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }
+
+        .map-fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .map-fullscreen-btn:hover {
+            background: var(--primary);
+            transform: scale(1.05);
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: staggerFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .input-group:nth-child(1) { animation-delay: 0.4s; }
+        .input-group:nth-child(2) { animation-delay: 0.5s; }
+        .input-group:nth-child(3) { animation-delay: 0.6s; }
+        .input-group:nth-child(4) { animation-delay: 0.7s; }
+        .input-group:nth-child(5) { animation-delay: 0.8s; }
+        .input-group:nth-child(6) { animation-delay: 0.9s; }
+        .input-group:nth-child(7) { animation-delay: 1.0s; }
+        .input-group:nth-child(8) { animation-delay: 1.1s; }
+
+        @keyframes staggerFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .input-group label {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #e2e8f0;
+            transition: color 0.3s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .help-text {
+            font-size: 0.8rem;
+            color: rgba(203, 213, 225, 0.7);
+            margin-bottom: 0.75rem;
+        }
+
+        .input-group input {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 1.1rem;
+            color: var(--text);
+            font-size: 1.05rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .input-group input:hover {
+            background: rgba(15, 23, 42, 0.6);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary);
+            background: rgba(15, 23, 42, 0.7);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2), 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+        }
+
+        .input-group input:focus ~ label {
+            color: var(--primary);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1.4rem;
+            border: none;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.6);
+            opacity: 0;
+            animation: fadeIn 1s 1.3s forwards;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 1px;
+        }
+
+        .submit-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+            transform: skewX(-20deg);
+            animation: btnShine 3s infinite;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        @keyframes btnShine {
+            0% { left: -100%; }
+            20% { left: 200%; }
+            100% { left: 200%; }
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 20px 35px -5px rgba(139, 92, 246, 0.8);
+            background: linear-gradient(135deg, var(--primary-hover) 0%, #d946ef 100%);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        /* Result Section & New Features */
+        .result-card {
+            margin-top: 2.5rem;
+            padding: 2.5rem;
+            border-radius: 20px;
+            text-align: center;
+            animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.26, 1.55) forwards;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .result-card.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .result-label {
+            font-size: 1.1rem;
+            color: #d1fae5;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+
+        .result-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            margin-bottom: 1.5rem;
+        }
+
+        .market-gauge {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .gauge-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .gauge-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #3b82f6, #8b5cf6);
+            border-radius: 6px;
+            transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 0%;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .secondary-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 0.8rem 1.5rem;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .secondary-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.8) translateY(30px); }
+            50% { opacity: 1; transform: scale(1.05) translateY(-10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Loading Spinner */
+        .loader-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 30px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(139, 92, 246, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        .loader-overlay p {
+            color: var(--primary);
+            font-weight: 600;
+            letter-spacing: 1px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 50% { opacity: 0.5; } }
+
+        /* Print styles */
+        @media print {
+            body { background: white !important; color: black !important; display: block; }
+            .bg-image, .bg-overlay, .submit-btn, .secondary-btn, .help-text { display: none !important; }
+            .container { box-shadow: none; border: none; backdrop-filter: none; background: white; max-width: 100%; margin: 0; padding: 0; }
+            .result-card { border: 2px solid #ccc; background: transparent; break-inside: avoid; }
+            .input-group input { border: none; border-bottom: 1px solid #ccc; border-radius: 0; color: black; }
+            .header h1 { background: none; -webkit-text-fill-color: black; }
+            .result-value { background: none; -webkit-text-fill-color: #10b981; }
+            .input-group label { color: #555; }
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 2rem; }
+            .header h1 { font-size: 2.25rem; }
+            .result-value { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-image"></div>
+    <div class="bg-overlay"></div>
+
+    <div class="container" id="mainContainer" data-tilt data-tilt-max="2" data-tilt-speed="400" data-tilt-glare data-tilt-max-glare="0.1">
+        <div class="loader-overlay" id="loader">
+            <div class="spinner"></div>
+            <p>Running AI Valuation Model...</p>
+        </div>
+
+        <div class="header">
+            <h1>California Dream Home</h1>
+            <p>AI-powered valuation for luxury California real estate properties</p>
+        </div>
+
+        <form method="post" id="predictionForm" onsubmit="showLoader()">
+            {% csrf_token %}
+            <div class="form-grid">
+                <div class="input-group">
+                    <label>Median Income (in USD)</label>
+                    <div class="help-text">Annual household income.</div>
+                    <input type="number" step="any" name="income" placeholder="e.g. 83200" required value="{{ request.POST.income }}">
+                </div>
+                <div class="input-group">
+                    <label>House Age (Years)</label>
+                    <div class="help-text">Median age of a house in the block.</div>
+                    <input type="number" step="any" name="age" placeholder="e.g. 41" required value="{{ request.POST.age }}">
+                </div>
+                <div class="input-group">
+                    <label>Average Rooms</label>
+                    <div class="help-text">Average rooms per household.</div>
+                    <input type="number" step="any" name="rooms" placeholder="e.g. 6.98" required value="{{ request.POST.rooms }}">
+                </div>
+                <div class="input-group">
+                    <label>Average Bedrooms</label>
+                    <div class="help-text">Average bedrooms per household.</div>
+                    <input type="number" step="any" name="bedrooms" placeholder="e.g. 1.02" required value="{{ request.POST.bedrooms }}">
+                </div>
+                <div class="input-group">
+                    <label>Population</label>
+                    <div class="help-text">Total population in the block.</div>
+                    <input type="number" step="any" name="population" placeholder="e.g. 322" required value="{{ request.POST.population }}">
+                </div>
+                <div class="input-group">
+                    <label>Average Occupancy</label>
+                    <div class="help-text">Average number of people living in the house.</div>
+                    <input type="number" step="any" name="occupancy" placeholder="e.g. 2.55" required value="{{ request.POST.occupancy }}">
+                </div>
+                <div class="map-section">
+                    <label style="font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.25rem;">Property Location (Interactive Map)</label>
+                    <div class="help-text">Click anywhere in California to automatically set Latitude and Longitude.</div>
+                    <div style="position: relative;">
+                        <button type="button" id="fullscreenBtn" class="map-fullscreen-btn" onclick="toggleFullScreenMap()">⛶ Expand Map</button>
+                        <div id="map"></div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Latitude</label>
+                    <div class="help-text">North-South geographic position.</div>
+                    <input type="number" step="any" name="latitude" id="latInput" placeholder="e.g. 37.88" required value="{{ request.POST.latitude }}">
+                </div>
+                <div class="input-group">
+                    <label>Longitude</label>
+                    <div class="help-text">East-West geographic position.</div>
+                    <input type="number" step="any" name="longitude" id="lngInput" placeholder="e.g. -122.23" required value="{{ request.POST.longitude }}">
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">Predict Market Value</button>
+        </form>
+
+        {% if error %}
+            <div class="result-card error">
+                <p>{{ error }}</p>
+            </div>
+        {% endif %}
+
+        {% if price %}
+            <div class="result-card success">
+                <div class="result-label">Estimated Value</div>
+                <div class="result-value" id="animatedPrice" data-target="{{ raw_price }}">$0.00</div>
+                
+                {% if gauge_percentage %}
+                <div class="market-gauge">
+                    <div class="gauge-label">
+                        <span>$0</span>
+                        <span>Market Value Index</span>
+                        <span>$1M+</span>
+                    </div>
+                    <div class="gauge-bar">
+                        <div class="gauge-fill" style="width: 0%;" data-target="{{ gauge_percentage }}%"></div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="action-buttons">
+                    <button type="button" class="secondary-btn" onclick="window.print()">
+                        <svg style="width:16px;height:16px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                        Print Report
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function showLoader() {
+            document.getElementById('loader').style.display = 'flex';
+        }
+
+        // Initialize Map
+        var map = L.map('map').setView([36.778259, -119.417931], 6); // Centered on California
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        var marker;
+
+        // Add map click event
+        map.on('click', function(e) {
+            var lat = e.latlng.lat.toFixed(4);
+            var lng = e.latlng.lng.toFixed(4);
+            
+            document.getElementById('latInput').value = lat;
+            document.getElementById('lngInput').value = lng;
+            
+            if (marker) {
+                marker.setLatLng(e.latlng);
+            } else {
+                marker = L.marker(e.latlng).addTo(map);
+            }
+        });
+
+        // Gauge Animation & Price Counting
+        window.onload = function() {
+            const gauge = document.querySelector('.gauge-fill');
+            if (gauge) {
+                setTimeout(() => {
+                    gauge.style.width = gauge.getAttribute('data-target');
+                }, 300);
+            }
+
+            const priceEl = document.getElementById('animatedPrice');
+            if (priceEl && priceEl.getAttribute('data-target')) {
+                const targetPrice = parseFloat(priceEl.getAttribute('data-target'));
+                animateValue(priceEl, 0, targetPrice, 2000); // 2 second counting animation
+            }
+        };
+
+        function toggleFullScreenMap() {
+            const mapDiv = document.getElementById('map');
+            const btn = document.getElementById('fullscreenBtn');
+            if (mapDiv.classList.contains('fullscreen')) {
+                mapDiv.classList.remove('fullscreen');
+                btn.innerHTML = '⛶ Expand Map';
+            } else {
+                mapDiv.classList.add('fullscreen');
+                btn.innerHTML = '✖ Close Map';
+            }
+            setTimeout(() => { map.invalidateSize(); }, 300); // allow css transition to finish
+        }
+
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // easeOut function for futuristic slowing down effect
+                const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+                const currentVal = Math.floor(easeOut * (end - start) + start);
+                
+                obj.innerHTML = "$" + currentVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = "{{ price }}"; // Final snap to exact formatted string
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
+</body>
+</html>
