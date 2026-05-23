@@ -42,7 +42,6 @@ The project includes:
 
 ## 📂 Project Structure
 
-```bash
 house_price_prediction/
 │
 ├── dataset/
@@ -97,6 +96,8 @@ pip install -r requirements.txt
 
 6️⃣ Run Django Server
 python manage.py runserver
+
+
 
 🎯 Model Accuracy
 Accurate house price prediction using regression techniques.
